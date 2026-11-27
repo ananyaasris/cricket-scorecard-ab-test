@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scorecard layout test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --turf:#0f1b17; --panel:#17302a; --line:#2b4a41; --ivory:#ece6d3; --muted:#9db3a9; --lamp:#f2b134; --wicket:#d4503f;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--turf);color:var(--ivory);font:16px/1.5 Barlow,system-ui,sans-serif;padding:24px 16px 48px}
+  main{max-width:720px;margin:0 auto}
+  h1{font:700 30px/1.1 "Barlow Condensed",sans-serif;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 20px}
+  .status{font-size:14px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin-bottom:20px}
+  .status b{color:var(--lamp);font-weight:500}
+  .match{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px}
+  .fixture{color:var(--muted);margin:0 0 12px}
+  .big{font:700 84px/1 "Barlow Condensed",sans-serif;color:var(--lamp);margin:0}
+  .big small{font-size:30px;color:var(--ivory);font-weight:500}
+  .small-score{font:700 26px/1.2 "Barlow Condensed",sans-serif;color:var(--lamp);margin:16px 0 0}
+  .need{margin:6px 0 0}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:4px 0 0}
+  .card{border:1px solid var(--line);border-radius:8px;padding:14px;background:var(--turf)}
+  .card h3{margin:0 0 6px;font:500 15px/1.2 Barlow,sans-serif;color:var(--muted)}
+  .card .who{font:700 22px/1.2 "Barlow Condensed",sans-serif}
+  .card .fig{font:700 40px/1.1 "Barlow Condensed",sans-serif;color:var(--lamp)}
+  .tiny{color:var(--muted);font-size:14px;margin:12px 0 0}
+  button{font:500 16px Barlow,sans-serif;cursor:pointer;border-radius:6px;padding:10px 18px}
+  button:focus-visible,input:focus-visible{outline:3px solid var(--lamp);outline-offset:2px}
+  #scorecard-btn{background:var(--lamp);color:#1a1405;border:0;margin-top:20px;font-weight:500}
+  #toast{min-height:24px;margin:10px 0 0;color:var(--lamp);font-size:14px}
+  .sim{margin-top:28px;border-top:1px solid var(--line);padding-top:20px}
+  .sim h2{font:700 22px/1.2 "Barlow Condensed",sans-serif;margin:0 0 6px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+  input[type=number]{width:90px;background:var(--panel);color:var(--ivory);border:1px solid var(--line);border-radius:6px;padding:9px}
+  #sim-btn{background:transparent;color:var(--ivory);border:1px solid var(--lamp)}
+  #sim-btn[disabled]{opacity:.5;cursor:wait}
+  progress{width:100%;height:8px;accent-color:var(--lamp)}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:500}
+  .note{color:var(--muted);font-size:14px}
+  @media (max-width:520px){.big{font-size:64px}.cards{grid-template-columns:1fr}}
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Match centre</h1>
+  <p class="sub">A made-up T20 match. Which layout gets more people to open the full scorecard?</p>
+  <div class="status" id="status">Connecting to Flagsmith…</div>
+
+  <section class="match" id="match" aria-live="polite"></section>
+  <div id="toast" role="status"></div>
+
+  <section class="sim">
+    <h2>Simulate visitors</h2>
+    <p class="note">Sends fake visitors through the real experiment. Each one gets its own ID, sees layout A or B, and clicks or not using made-up click rates (set at the top of the script).</p>
+    <div class="row">
+      <label for="n">Visitors</label>
+      <input id="n" type="number" min="10" max="500" value="100">
+      <button id="sim-btn" type="button">Run simulation</button>
+    </div>
+    <progress id="bar" value="0" max="100" aria-label="Simulation progress"></progress>
+    <table>
+      <thead><tr><th>Layout</th><th>Visitors</th><th>Clicks</th><th>Click rate</th></tr></thead>
+      <tbody>
+        <tr><td>A: big score first</td><td id="av">0</td><td id="ac">0</td><td id="ar">–</td></tr>
+        <tr><td>B: player stats first</td><td id="bv">0</td><td id="bc">0</td><td id="br">–</td></tr>
+      </tbody>
+    </table>
+    <p class="note" id="simnote">The win probability appears on the experiment page in Flagsmith a few minutes after the run.</p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@flagsmith/flagsmith@12.4.0/index.js"></script>
+<script>
+// ---- Settings: change these ----
+const FLAGSMITH_KEY = "6ZxE9kLNninWBmhmmCaZYY"; // Client-side Environment Key, Development environment
+const FLAG_NAME = "scorecard_layout";
+const EVENT_NAME = "scorecard_click";      // must match the metric's event name exactly
+const FAKE_CLICK_RATE = { A: 0.30, B: 0.40 }; // made-up rates for the simulation only
+// --------------------------------
+
+const $ = (id) => document.getElementById(id);
+const fm = window.flagsmith;
+let liveId = null;
+
+function getLiveId() {
+  try {
+    let id = localStorage.getItem("live_visitor");
+    if (!id) { id = "live_" + Math.random().toString(36).slice(2, 10); localStorage.setItem("live_visitor", id); }
+    return id;
+  } catch (e) { return "live_" + Math.random().toString(36).slice(2, 10); }
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function render(arm) {
+  const box = $("match");
+  box.replaceChildren();
+  box.appendChild(el("p", "fixture", "India v Australia, 2nd T20I (made-up match)"));
+
+  const topStats = () => {
+    const cards = el("div", "cards");
+    const bat = el("div", "card");
+    bat.append(el("h3", "", "Top batter"), el("div", "who", "A. Verma"), el("div", "fig", "74 (48)"));
+    const bowl = el("div", "card");
+    bowl.append(el("h3", "", "Top bowler"), el("div", "who", "K. Raman"), el("div", "fig", "3/21"));
+    cards.append(bat, bowl);
+    return cards;
+  };
+
+  if (arm === "B") {
+    box.appendChild(topStats());
+    box.appendChild(el("p", "small-score", "India 186/4 (20 overs)"));
+    box.appendChild(el("p", "need", "Australia need 187 to win"));
+  } else {
+    const big = el("p", "big", "186/4 ");
+    big.appendChild(el("small", "", "(20 overs)"));
+    box.appendChild(big);
+    box.appendChild(el("p", "need", "India set Australia 187 to win"));
+    box.appendChild(el("p", "tiny", "Top batter A. Verma 74 (48), top bowler K. Raman 3/21"));
+  }
+  const btn = el("button", "", "Full scorecard");
+  btn.id = "scorecard-btn";
+  btn.type = "button";
+  btn.addEventListener("click", onClick);
+  box.appendChild(btn);
+}
+
+function armOf(flag) { return flag && flag.value === "player_stats" ? "B" : "A"; }
+
+async function showLive() {
+  await fm.identify(liveId);
+  const flag = fm.getExperimentFlag(FLAG_NAME); // records the exposure
+  const arm = armOf(flag);
+  const enrolled = !!(flag && flag.experiment && flag.experiment.inExperiment);
+  render(arm);
+  $("status").replaceChildren(
+    document.createTextNode("Connected. Visitor "), Object.assign(el("b", "", liveId), {}),
+    document.createTextNode(" sees layout "), el("b", "", arm + " (" + (flag ? flag.value : "default") + ")"),
+    document.createTextNode(enrolled ? ", enrolled in the experiment." : ", not enrolled in an experiment.")
+  );
+}
+
+function onClick() {
+  fm.trackEvent(EVENT_NAME);
+  $("toast").textContent = "Click recorded as " + EVENT_NAME + ".";
+  setTimeout(() => fm.flushEvents(), 500);
+}
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function simulate(n) {
+  const btn = $("sim-btn");
+  btn.disabled = true;
+  const t = { A: { v: 0, c: 0 }, B: { v: 0, c: 0 } };
+  const run = Date.now().toString(36);
+  let skipped = 0;
+  const paint = () => {
+    for (const k of ["A", "B"]) {
+      const p = k.toLowerCase();
+      $(p + "v").textContent = t[k].v;
+      $(p + "c").textContent = t[k].c;
+      $(p + "r").textContent = t[k].v ? ((100 * t[k].c) / t[k].v).toFixed(1) + "%" : "–";
+    }
+  };
+  $("bar").max = n; $("bar").value = 0;
+  try {
+    for (let i = 1; i <= n; i++) {
+      await fm.identify("sim_" + run + "_" + i);
+      const flag = fm.getExperimentFlag(FLAG_NAME); // exposure
+      if (!flag || !flag.experiment || !flag.experiment.inExperiment) { skipped++; continue; }
+      const arm = armOf(flag);
+      t[arm].v++;
+      await wait(5); // make sure the click is after the exposure
+      if (Math.random() < FAKE_CLICK_RATE[arm]) { fm.trackEvent(EVENT_NAME); t[arm].c++; }
+      $("bar").value = i;
+      paint();
+    }
+    await fm.flushEvents();
+    $("simnote").textContent = "Done. " + (skipped ? skipped + " visitors were not enrolled. " : "") +
+      "Open the experiment in Flagsmith and refresh after a few minutes to see the win probability.";
+  } catch (e) {
+    $("simnote").textContent = "Simulation stopped: " + e.message;
+  } finally {
+    await fm.identify(liveId);
+    btn.disabled = false;
+  }
+}
+
+(async function start() {
+  if (FLAGSMITH_KEY.startsWith("PASTE")) {
+    $("status").textContent = "Paste your Client-side Environment Key into FLAGSMITH_KEY near the top of the script, then reload.";
+    render("A");
+    return;
+  }
+  try {
+    liveId = getLiveId();
+    await fm.init({ environmentID: FLAGSMITH_KEY, enableEvents: true, identity: liveId });
+    await showLive();
+    $("sim-btn").addEventListener("click", () => simulate(Math.min(500, Math.max(10, +$("n").value || 100))));
+  } catch (e) {
+    $("status").textContent = "Could not connect to Flagsmith: " + e.message;
+    render("A");
+  }
+  window.addEventListener("pagehide", () => fm.flushEvents());
+})();
+</script>
+</body>
+</html>
