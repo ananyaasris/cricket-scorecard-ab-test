@@ -21,6 +21,24 @@ All visitors and clicks are simulated. The page sends fake visitors through the 
 - `cricket-ready.html`: the match page and the visitor simulator
 - `results.png`: screenshot of the Flagsmith results
 
+
+  ## Setup
+
+1. Download `cricket-ready.html` and open it in Chrome (double-click the file).
+2. In Flagsmith, create a project and a Development environment.
+3. Create a multivariate feature flag named `scorecard_layout` with two values: `big_score` (control) and `player_stats` (variant).
+4. Create a metric named "Scorecard click rate": type Occurrence, event name `scorecard_click`.
+5. Create an experiment called "Scorecard layout test" using that flag and metric, with a 50/50 split at 100% rollout.
+6. Copy your Client-side Environment Key and paste it into `FLAGSMITH_KEY` at the top of the script in `cricket-ready.html`.
+7. Reload the page. It shows which layout you were given. Click "Full scorecard" to record a click.
+8. Under "Simulate visitors", click Run simulation. Open the experiment in Flagsmith and refresh after a few minutes to see the results.
+
+## How Flagsmith is used
+
+- A multivariate flag chooses the layout shown to each visitor.
+- The JavaScript SDK records each visitor's exposure and sends the `scorecard_click` event.
+- Flagsmith Experimentation compares the two click rates and gives the win probability.
+
 ## Results
 
 Flagsmith experiment "Scorecard layout test" (data as of 27 Nov 2026, 13:05 UTC). Two runs of 100 simulated visitors.
